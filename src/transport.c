@@ -33,6 +33,7 @@
 #include "rfcomm.h"
 #include "utils.h"
 #include "shared/log.h"
+#include "shared/rt_threads.h"
 
 
 static int io_thread_create(struct ba_transport *t) {
@@ -97,6 +98,18 @@ static int io_thread_create(struct ba_transport *t) {
 		error("Couldn't create IO thread: %s", strerror(ret));
 		t->thread = config.main_thread;
 		return -1;
+	}
+
+	struct sched_param rtparam;
+	memset(&rtparam, 0, sizeof(rtparam));
+	rtparam.sched_priority = IO_THREAD_RT_PRIORITY;
+
+	if ((errno = pthread_setschedparam(t->thread, IO_THREAD_SCHED_POLICY,
+					   &rtparam)) != 0) {
+		warn("cannot set scheduling to %d at priority %d) "
+		      "for ALSA I/O thread (%d: %s)",
+		      IO_THREAD_SCHED_POLICY,
+		      rtparam.sched_priority, errno, strerror(errno));
 	}
 
 	pthread_setname_np(t->thread, "baio");

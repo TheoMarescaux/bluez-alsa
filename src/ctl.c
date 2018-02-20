@@ -33,6 +33,7 @@
 #include "transport.h"
 #include "utils.h"
 #include "shared/log.h"
+#include "shared/rt_threads.h"
 
 
 /**
@@ -632,6 +633,18 @@ int bluealsa_ctl_thread_init(void) {
 	if ((errno = pthread_create(&config.ctl.thread, NULL, ctl_thread, NULL)) != 0) {
 		config.ctl.thread_created = false;
 		goto fail;
+	}
+
+	struct sched_param rtparam;
+	memset(&rtparam, 0, sizeof(rtparam));
+	rtparam.sched_priority = CTL_THREAD_RT_PRIORITY;
+
+	if ((errno = pthread_setschedparam(config.ctl.thread, CTL_THREAD_SCHED_POLICY,
+					   &rtparam)) != 0) {
+		warn("cannot set scheduling to %d at priority %d) "
+		      "for CTL thread (%d: %s)",
+		      CTL_THREAD_SCHED_POLICY,
+		      rtparam.sched_priority, errno, strerror(errno));
 	}
 
 	/* name controller thread - for aesthetic purposes only */

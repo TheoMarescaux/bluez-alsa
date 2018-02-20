@@ -27,6 +27,7 @@
 
 #include "shared/ctl-client.h"
 #include "shared/log.h"
+#include "shared/rt_threads.h"
 
 /* Casting wrapper for the brevity's sake. */
 #define CANCEL_ROUTINE(f) ((void (*)(void *))(f))
@@ -664,6 +665,18 @@ init:
 				if ((ret = pthread_create(&worker->thread, NULL, pcm_worker_routine, worker)) != 0) {
 					warn("Couldn't create PCM worker %s: %s", worker->addr, strerror(ret));
 					workers_count--;
+				}
+
+				struct sched_param rtparam;
+				memset(&rtparam, 0, sizeof(rtparam));
+				rtparam.sched_priority = APLAY_ALSA_THREAD_RT_PRIORITY;
+
+				if ((ret = pthread_setschedparam(worker->thread, APLAY_ALSA_THREAD_SCHED_POLICY,
+								 &rtparam)) != 0) {
+					warn("cannot set scheduling to %d at priority %d) "
+					     "for ALSA worker thread (%d: %s)",
+					     APLAY_ALSA_THREAD_SCHED_POLICY, 
+					     rtparam.sched_priority, ret, strerror(ret));
 				}
 
 			}

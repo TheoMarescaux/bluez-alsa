@@ -27,6 +27,7 @@
 #include "shared/ctl-proto.h"
 #include "shared/log.h"
 #include "shared/rt.h"
+#include "shared/rt_threads.h"
 
 
 struct bluealsa_pcm {
@@ -255,6 +256,18 @@ static int bluealsa_start(snd_pcm_ioplug_t *io) {
 		pcm->io_started = false;
 		io->state = prev_state;
 		return -errno;
+	}
+
+	struct sched_param rtparam;
+	memset(&rtparam, 0, sizeof(rtparam));
+	rtparam.sched_priority = ALSA_IO_THREAD_RT_PRIORITY;
+
+	if ((errno = pthread_setschedparam(pcm->io_thread, ALSA_IO_THREAD_SCHED_POLICY,
+					   &rtparam)) != 0) {
+		warn("cannot set scheduling to %d at priority %d) "
+		      "for ALSA I/O thread (%d: %s)",
+		      ALSA_IO_THREAD_SCHED_POLICY,
+		      rtparam.sched_priority, errno, strerror(errno));
 	}
 
 	pthread_setname_np(pcm->io_thread, "pcm-io");
